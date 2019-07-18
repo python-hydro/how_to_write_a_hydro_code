@@ -1,4 +1,4 @@
-"""Solve riemann shock tube problem for a general equation of state
+r"""Solve riemann shock tube problem for a general equation of state
 using the method of Colella, Glaz, and Ferguson (this is the main
 solver used in Castro).  Use a two shock approximation, and linearly
 interpolation between the head and tail of a rarefaction to treat
@@ -39,7 +39,6 @@ separated by the three characteristics (u - cs, u, u + cs):
 """
 
 import numpy as np
-import sys
 
 URHO = 0
 UMX = 1
@@ -53,6 +52,8 @@ NVAR = 3
 
 
 def riemann(q_l, q_r, gamma):
+    """solve the Riemann problem given left and right primitive variable
+    states.  We return the flux"""
 
     flux = np.zeros(NVAR)
 
@@ -60,17 +61,13 @@ def riemann(q_l, q_r, gamma):
     small_p = 1.e-10
     small_u = 1.e-10
 
-    rho_l = q_l[QRHO]
+    rho_l = max(q_l[QRHO], small_rho)
     u_l = q_l[QU]
-    p_l = max(q_l[QP], smallp)
+    p_l = max(q_l[QP], small_p)
 
-    rho_r = q_r[QRHO]
+    rho_r = max(q_r[QRHO], small_rho)
     u_r = q_r[QU]
-    p_r = max(q_r[QP], smallp)
-
-    # specific volume
-    tau_l = 1./max(rho_l, smlrho)
-    tau_r = 1./max(rho_r, smlrho)
+    p_r = max(q_r[QP], small_p)
 
     # wave speeds (Lagrangian sound speed)
     w_l = np.sqrt(gamma*p_l*rho_l)
@@ -78,17 +75,17 @@ def riemann(q_l, q_r, gamma):
 
     # construct our guess at pstar and ustar
     wwinv = 1.0/(w_l + w_r)
-    pstar = ((w_r*p_l + w_l*p_r) + w_l*w_r*(u_l - u_r))*wwinv
-    ustar = ((w_l*u_l + w_r*u_r) + (p_l - p_r))*wwinv
+    p_star = ((w_r*p_l + w_l*p_r) + w_l*w_r*(u_l - u_r))*wwinv
+    u_star = ((w_l*u_l + w_r*u_r) + (p_l - p_r))*wwinv
 
-    pstar = max(pstar, small_p)
+    p_star = max(p_star, small_p)
 
-    if ustar > 0:
+    if u_star > 0:
         rho_o = rho_l
         u_o = u_l
         p_o = p_l
 
-    elif ustar < 0:
+    elif u_star < 0:
         rho_o = rho_r
         u_o = u_r
         p_o = p_r
@@ -100,31 +97,62 @@ def riemann(q_l, q_r, gamma):
 
     rho_o = max(rho_o, small_rho)
 
-    co = np.sqrt(gamma*p_o/rho_o)
+    c_o = np.sqrt(gamma*p_o/rho_o)
 
     # compute the rest of the star state
-    drho = (pstar - p_o)/co**2
+    drho = (p_star - p_o)/c_o**2
     rho_star = rho_o + drho
 
-    cstar = np.sqrt(gamma * pstar/rho_star)
+    c_star = np.sqrt(gamma * p_star/rho_star)
 
     # sample the solution
-    sgn = np.sign(ustar)
-    spout = co - sgn*uo
-    spin = cstar - sgn*ustar
+    sgn = np.sign(u_star)
+    spout = c_o - sgn*u_o
+    spin = c_star - sgn*u_star
 
     ushock = 0.5*(spin + spout)
 
-    if pstar > p_o:
+    if p_star > p_o:
         # compression -- we are a shock
         spin = ushock
         spout = ushock
 
-    if 
+    if spout-spin == 0.0:
+        cavg = 0.5 * (np.sqrt(gamma*p_l/rho_l) + np.sqrt(gamma*p_r/rho_r))
+        scr = small_u*0.5*cavg
+    else:
+        scr = spout - spin
+
+    # interpolate for the case we have a rarefaction
+    frac = 0.5*(1.0 + (spout + spin)/scr)
+    frac = max(0.0, min(1.0, frac))
+
+    rho_int = frac*rho_star + (1.0 - frac)*rho_o
+    u_int = frac*u_star + (1.0 - frac)*u_o
+    p_int = frac*p_star + (1.0 - frac)*p_o
+
+    # here we are assuming that the rarefaction spans the interface.  Correct that now
+    if spout < 0.0:
+        rho_int = rho_o
+        u_int = u_o
+        p_int = p_o
+
+    if spin >= 0.0:
+        rho_int = rho_star
+        u_int = u_star
+        p_int = p_star
 
     # now compute the fluxes
-    flux[URHO] = rhoav*uav
-    flux[UMX] = rhoav*uav*uav + pav
-    flux[UENER] = uav*(pav/(gamma - 1.0) + 0.5*rhoav*uav*uav + pav)
+    flux[URHO] = rho_int*u_int
+    flux[UMX] = rho_int*u_int**2 + p_int
+    flux[UENER] = u_int*(p_int/(gamma - 1.0) + 0.5*rho_int*u_int**2 + p_int)
 
     return flux
+
+if __name__ == "__main__":
+    q_l = np.array([1.0, 0.0, 1.0])
+    q_r = np.array([0.125, 0.0, 0.1])
+    gamma = 1.4
+
+    F = riemann(q_l, q_r, gamma)
+    print(F)
