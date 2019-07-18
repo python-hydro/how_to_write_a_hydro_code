@@ -1,0 +1,21 @@
+.reveal pre code {
+padding: 0.5em;
+}
+
+
+.reveal p {
+margin-bottom: 0.25em;
+margin-top: 0.5em;
+}
+
+.reveal ul {
+padding: 0em;
+margin-top: 0.5em;
+}
+
+.reveal {
+font-size: 125;
+font-family: carlito;
+}
+
+
