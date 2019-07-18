@@ -70,8 +70,9 @@ def riemann(q_l, q_r, gamma):
     p_r = max(q_r[QP], small_p)
 
     # wave speeds (Lagrangian sound speed)
-    w_l = np.sqrt(gamma*p_l*rho_l)
-    w_r = np.sqrt(gamma*p_r*rho_r)
+    wsmall = small_rho * small_u
+    w_l = max(np.sqrt(abs(gamma*p_l*rho_l)), wsmall)
+    w_r = max(np.sqrt(abs(gamma*p_r*rho_r)), wsmall)
 
     # construct our guess at pstar and ustar
     wwinv = 1.0/(w_l + w_r)
@@ -80,7 +81,10 @@ def riemann(q_l, q_r, gamma):
 
     p_star = max(p_star, small_p)
 
-    if u_star > 0:
+    if abs(u_star) < small_u*0.5*(abs(u_l) + abs(u_r)):
+        u_star = 0.0
+        
+    if u_star > 0.0:
         rho_o = rho_l
         u_o = u_l
         p_o = p_l
@@ -97,14 +101,17 @@ def riemann(q_l, q_r, gamma):
 
     rho_o = max(rho_o, small_rho)
 
-    c_o = np.sqrt(gamma*p_o/rho_o)
+    c_o = np.sqrt(abs(gamma*p_o/rho_o))
+    c_o = max(c_o, small_u)
 
     # compute the rest of the star state
     drho = (p_star - p_o)/c_o**2
     rho_star = rho_o + drho
-
+    rho_star = max(rho_star, small_rho)
+    
     c_star = np.sqrt(gamma * p_star/rho_star)
-
+    c_star = max(c_star, small_u)
+    
     # sample the solution
     sgn = np.sign(u_star)
     spout = c_o - sgn*u_o
@@ -118,7 +125,7 @@ def riemann(q_l, q_r, gamma):
         spout = ushock
 
     if spout-spin == 0.0:
-        cavg = 0.5 * (np.sqrt(gamma*p_l/rho_l) + np.sqrt(gamma*p_r/rho_r))
+        cavg = 0.5 * (np.sqrt(abs(gamma*p_l/rho_l)) + np.sqrt(abs(gamma*p_r/rho_r)))
         scr = small_u*0.5*cavg
     else:
         scr = spout - spin
