@@ -1,4 +1,18 @@
-# solve the Riemann problem for a gamma-law gas
+"""An exact Riemann solver for the Euler equations with a gamma-law
+gas.  The left and right states are stored as State objects.  We then
+create a RiemannProblem object with the left and right state:
+
+> rp = RiemannProblem(left_state, right_state)
+
+Next we solve for the star state:
+
+> rp.find_star_state()
+
+Finally, we sample the solution to find the interface state, which
+is returned as a State object:
+
+> q_int = rp.sample_solution()
+"""
 
 import numpy as np
 import scipy.optimize as optimize
@@ -95,6 +109,8 @@ class RiemannProblem(object):
         lambda_head = state.u + sgn*c
         lambda_tail = self.ustar + sgn*cstar
 
+        gam_fac = (self.gamma - 1.0)/(self.gamma + 1.0)
+
         if (sgn > 0 and lambda_head < 0) or (sgn < 0 and lambda_head > 0):
             # R/L region
             solution = state
@@ -117,8 +133,6 @@ class RiemannProblem(object):
 
     def sample_solution(self):
         """given the star state (ustar, pstar), find the state on the interface"""
-
-        gam_fac = (self.gamma - 1.0)/(self.gamma + 1.0)
 
         if self.ustar < 0:
             # we are in the R* or R region
@@ -149,6 +163,7 @@ def cons_flux(state, v):
     flux[v.uener] = (0.5 * state.rho * state.u**2 +
                      state.p/(v.gamma - 1.0) + state.p) * state.u
     return flux
+
 
 if __name__ == "__main__":
 
