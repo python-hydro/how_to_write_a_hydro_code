@@ -1,0 +1,4 @@
+.ipynb_checkpoints/
+__pycache__/
+*~
+write_a_hydrocode.slides.html
